@@ -1,0 +1,22 @@
+
+html
+	head
+		title
+	body
+		form(method="post", action="/adduser")
+			p
+				input(type="text",name="userid",placeholder="계정 (전화번호)")
+			p
+				input(type="text",name="name",placeholder="이름")
+			p
+				input(type="text",name="gender",placeholder="성별 (0 : 남자, 1: 여자)")
+			p
+				input(type="text",name="email",placeholder="email")
+			p
+				input(type="text",name="pronunciation_level",placeholder="발음 레벨")
+			p
+				input(type="text",name="speaking_level",placeholder="스피킹 레벨")
+			p
+				input(type="text",name="remained_class",placeholder="남은 클래스")
+			p
+				input(type="submit", name="사용자 생성")
