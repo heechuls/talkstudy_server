@@ -3,10 +3,11 @@ html
 	head
 		title
 	body
-		form(method="post", action="/push_notice")
-			p
-				input(type="text",name="title",placeholder="제목", style="width:200px")
-			p
-				input(type="text",name="body",placeholder="공지 내용", style="width:400px;height:400px;text-align:top")
-			p
-				input(type="submit")
+		div(ng-view)
+			form(method="post", action="/push_notice")
+				p
+					input(type="text",name="title",placeholder="제목", style="width:200px")
+				p
+					input(type="text",name="body",placeholder="공지 내용", style="width:400px;height:400px;text-align:top")
+				p
+					input(type="submit")

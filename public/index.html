@@ -1,0 +1,54 @@
+<!-- index.html -->
+<!doctype html>
+
+<!-- ASSIGN OUR ANGULAR MODULE -->
+<html ng-app="starter">
+
+<head>
+  <!-- META -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Optimize mobile viewport -->
+
+  <!-- SCROLLS -->
+  <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.0.0/css/bootstrap.min.css">
+  <!-- load bootstrap -->
+  <style>
+    html {
+      overflow-y: scroll;
+    }
+    
+    body {
+      padding-top: 50px;
+    }
+    
+    #todo-list {
+      margin-bottom: 30px;
+    }
+  </style>
+
+  <!-- SPELLS -->
+  <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+  <!-- load jquery -->
+  <script src="//ajax.googleapis.com/ajax/libs/angularjs/1.0.8/angular.min.js"></script>
+  <!-- load angular -->
+  <script src="core.js"></script>
+</head>
+
+<body ng-controller="HeaderController">
+  <!-- SET THE CONTROLLER AND GET ALL TODOS -->
+  <!-- Static navbar -->
+  <nav class="navbar navbar-default">
+    <div id="navbar" class="navbar-collapse collapse">
+      <ul class="nav navbar-nav">
+        <li ng-class="{ active: isActive('/adduser')}"><a href="/adduser">회원 등록</a></li>
+        <li ng-class="{ active: isActive('/push_notice')}"><a href="/push_notice">공지 발송</a></li>
+        <li ng-class="{ active: isActive('/download')}"><a href="/download">다운로드 페이지</a></li>
+      </ul>
+    </div>
+    <!--/.nav-collapse -->
+  </nav>
+  <div ng-view></div>
+</body>
+
+</html>
