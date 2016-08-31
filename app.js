@@ -14,6 +14,7 @@ var upload = multer({
 var serverKey = 'AIzaSyDDOwrBzOvAbS2jC_Crg8ba3zk5xSetz6o';
 var firebase = require('firebase');
 var dbhandler = require("./dbhandler");
+require('events').EventEmitter.defaultMaxListeners = Infinity;
 
 var fcm = new FCM(serverKey);
 var app = new express();
@@ -26,6 +27,9 @@ var options = {
     key: './key.pem',
     passphrase: "slrtm978!"
 };
+//var PHONETALK_PARTICIPANT = "/phonetalk_test/";
+var PHONETALK_PARTICIPANT = "/phonetalk_participant/";
+
 var home = "http://lunar-pic.com:6500";
 var urloption = "short";
 var GoogleUrl = require('google-url');
@@ -47,7 +51,7 @@ var token_list = [
     '376a3aa6ac2a76ae77f21c93ce3fccdeca6efcebaf50338c66106f71500f000a'//,
 ];
 
-function sendFCM(token, title, body, data) {
+function sendFCM(userid, token, title, body, data) {
     var message = {
         to: token,
         //registration_ids: token_list,
@@ -68,8 +72,9 @@ function sendFCM(token, title, body, data) {
             console.log("Successfully sent with response: ", response);
         }
     });
+    console.log("FCM Sent : " + userid);
 }
-function sendApns(token, title, payload) {
+function sendApns(userid, token, title, payload) {
     var myDevice = new apn.Device(token);
     var note = new apn.Notification();
 
@@ -80,6 +85,7 @@ function sendApns(token, title, payload) {
     note.payload = payload;
 
     apnConnection.pushNotification(note, myDevice);
+    console.log("APNS Sent : " + userid);
 }
 
 
@@ -91,6 +97,7 @@ function send_bulk_push() {
 
 app.use('/uploads', express.static('./uploads'));
 app.use('/download', express.static('./download'));
+app.use('/uploads', express.static('./uploads'));
 
 app.get('/push_notice', function (req, res) {
     res.render('push');
@@ -118,7 +125,6 @@ app.get('*', function(req, res) {
 
 app.post('/adduser', function (req, res) {
     console.log(req.body);
-    console.log(dbhandler);
     if(req.body["password"] != "xhrxjel01"){
         res.send("비밀번호를 확인해주세요.");
         return;
@@ -181,18 +187,17 @@ app.post('/upload', upload, function (req, res) {
     }
 });
 
-app.use('/uploads', express.static('./uploads'));
-
-// index.js end of file
 var port = 6500;
 
 app.listen(port, function () { console.log('listening on port ' + port); });
 function minuteInterval() {
     var current = new Date();
+    var day = current.getDay();
     console.log(current.toTimeString());
     var hour = current.getHours();
     var min = current.getMinutes();
-    if ((min == 0) && (hour == 15 || hour == 16 || hour == 18)) {
+    if (((min == 0) && (hour == 15 || hour == 16 || hour == 18) && (day >=1 && day <=4)) ||
+    ((min == 0) && (hour == 12) && (day == 6))) {
         isClassToday(function (retval) {
             if (retval == true)
                 sendPushAll("금일 스터디에 참여하시겠습니까?", { code: "STUDY_PARTICIPATION", body: "앱에서 스터디 참여 여부를 답해주세요." });
@@ -209,18 +214,20 @@ function minuteInterval() {
 
 function minuteInterval2() {
     var current = new Date();
-    console.log(current.toTimeString());
     var hour = current.getHours();
     var min = current.getMinutes();
-    if ((min == 0) && (hour == 15 || hour == 16 || hour == 18)) {
+    var day = current.getDay();
+    if (((min == 0) && (hour == 15 || hour == 16 || hour == 18) && (day >=1 && day <=4)) ||
+         ((min == 0) && (hour == 12) && (day == 6 || day == 0))) {
+        console.log(current.toTimeString() + " : Study Notification");
         isClassToday(function (retval) {
             if (retval == true) {
                 getAllUserListForPush(function(user_list){
                     for(var i in user_list){
                         var user = user_list[i];
-                        isClassConfirmed(user.userid, function(retval){               
-                            if(retval != false)     
-                                sendPush(user, "금일 스터디에 참여하시겠습니까?", { code: "STUDY_PARTICIPATION", body: "앱에서 스터디 참여 여부를 답해주세요." });
+                        isClassConfirmed(user, user.userid, function(user, retval){               
+                            if(retval == false)     
+                                sendPush(user, user.name + "님 금일 스터디에 참여하시겠습니까?", { code: "STUDY_PARTICIPATION", body: "앱에서 스터디 참여 여부를 답해주세요." });
                         });
                     }
                 });
@@ -228,64 +235,76 @@ function minuteInterval2() {
         });
     }
     if (min == 10 && hour == 22){ //((min == 0 && hour == 20) || (min == 10 && hour == 21) || (min == 10 && hour == 22)) {
+        console.log(current.toTimeString() + " : Phonetalk Notification");
         getAllUserListForPush(function (user_list) {
             for (var i in user_list) {
                 var user = user_list[i];
-                isPhonetalkConfirmed(user.userid, function (retval) {
-                    if(retval != false)
-                        sendPush(user, "금일 전화영어에 참여하시겠습니까?", { code: "PHONETALK_PARTICIPATION", body: "앱에서 전화영어 참여 여부를 답해주세요." });
+                isPhonetalkConfirmed(user, user.userid, function (user, retval) {
+                    if(retval == false)
+                        sendPush(user, user.name + "님 금일 전화영어에 참여하시겠습니까?", { code: "PHONETALK_PARTICIPATION", body: "앱에서 전화영어 참여 여부를 답해주세요." });
                 });
             }
         });
     }
-    if (min == 50 && hour == 22) {
+    if(min == 50 && hour == 22) {
+        console.log(current.toTimeString() + " : Phonetalk Match");
         matchPhoneTalk();
     }
-    if (min == 51 && hour == 22) {
+    if(min == 51 && (hour == 22 || hour == 21 )) {
+        console.log(current.toTimeString() + " : Phonetalk Match Notification");
+        getAllMatchedUserList(function(matched_list){
+            for(var i in matched_list){
+                var user = matched_list[i];
+                sendPush(user, user.name + "님 전화영어 매치가 되었습니다.", { code: "PHONETALK_MATCHED", body: user.matched_name + "(" + user.matched +")" + "님께 23시에 전화를 주시기 바랍니다."});
+            }
+        });
+        getAllUnmatchedUserList(function(unmatched_list){
+            for(var i in unmatched_list){
+                var user = unmatched_list[i];
+                sendPush(user, user.name + "님 전화영어 매치되지 않았습니다.", { code: "PHONETALK_NOT_MATCHED", body: "다음 기회를 이용해주세요." });
+            }
+        });
+
+    }
+    if(min == 00 && hour == 23) {
+        console.log(current.toTimeString() + " : Phonetalk Start Notification");
         getAllMatchedUserList(function(user_list){
             for(var i in user_list){
                 var user = user_list[i];
-                sendPush(user, "전화영어 매치가 되었습니다.", { code: "PHONETALK_MATCHED", body: user.matched_name + "(" + user.matched +")" + "님께 23시에 전화를 주시기 바랍니다."});
+                sendPush(user, user.name + "님 전화영어가 시작되었습니다.", { code: "PHONETALK_STARTED", body: user.matched_name + "(" + user.matched +")" + "님께 바로 전화를 주시기 바랍니다."});
             }
         });
-        getAllUnmatchedUserList(function(user_list){
+    }
+    if(min == 10 && hour == 23) {
+        console.log(current.toTimeString() + " : Phonetalk End Notification");
+        getAllMatchedUserList(function(user_list){
             for(var i in user_list){
                 var user = user_list[i];
-                sendPush(user, "전화영어 매치되지 않았습니다.", { code: "PHONETALK_MATCHED", body: "다음 기회를 이용해주세요." });
+                sendPush(user, user.name + "님 전화영어 10분이 종료되었습니다.", { code: "PHONETALK_ENDED", body: "즐거운 시간이 되었나요? 전화영어를 마무리해주세요."});
             }
         });
-
-    }
-    if (min == 10 && hour == 23) {
-        sendPushAll("전화영어 10분이 종료되었습니다.", { code: "NOTICE", body: "" });
-    }
-    if (min == 00 && hour == 23) {
-        sendPushAll("전화영어가 시작되었습니다.", { code: "NOTICE", body: "" });
     }
 }
 
-function isClassConfirmed(userid, done){
+function isClassConfirmed(user, userid, done){
     firebase.database().ref('/study_activity/' + userid + "/" + new Date().yyyymmdd() + "/class_participation").once("value", function (snapshot) {
         if(snapshot.exists())
-            done(true);
-        else done(false);
+            done(user, true);
+        else done(user, false);
     });
 }
 
-function isPhonetalkConfirmed(userid, done){
+function isPhonetalkConfirmed(user, userid, done){
     firebase.database().ref('/study_activity/' + userid + "/" + new Date().yyyymmdd() + "/phonetalk_participation").once("value", function (snapshot) {
         if(snapshot.exists())
-            done(true);
-        else done(false);
+            done(user, true);
+        else done(user, false);
     });
 }
-
-setInterval(minuteInterval, 60000);
 
 function isClassToday(done) {
     var classRef = firebase.database().ref().child('class/');
     classRef.child(new Date().yyyymmdd()).once('value', function (snapshot) {
-        console.log(snapshot.val());
         today = new Date();
         if (snapshot.exists())
             done(false);
@@ -303,17 +322,6 @@ var config = {
 };
 firebase.initializeApp(config);
 
-//Initial Trigger
-
-//sendApns(token_list[0], "금일 수업에 참여하시겠습니까?");
-
-//sendPushAll("금일 스터디에 참여하시겠습니까?", {code : "STUDY_PARTICIPATION", body : "금일 스터디 참석 여부를 알려주세요."});
-//sendPushAll("금일 전화영어에 참여하시겠습니까?", { code: "PHONETALK_PARTICIPATION", body: "하이요" });
-//sendPushAll("금일 전화영어가 매치되었습니다?", { code: "PHONETALK_MATCHED", body: "하이요" });
-minuteInterval2();
-
-matchPhoneTalk();
-
 function sendPushAll(message, payload, done) {
     var userRef = firebase.database().ref('/user/');
     userRef.once("value", function (allUserSnapshot) {
@@ -321,12 +329,13 @@ function sendPushAll(message, payload, done) {
             var user = {
                 name: snapshot.key,
                 token: snapshot.val()._token,
-                device_type: snapshot.val().device_type
+                device_type: snapshot.val().device_type,
+                userid: snapshot.val().userid
             };
             if (user.device_type == 1 && user.token != undefined && user.token != "WEB")
-                sendFCM(user.token, message, payload["body"], { code: payload["code"], body: payload["body"] });
+                sendFCM(user.userid, user.token, message, payload["body"], { code: payload["code"], body: payload["body"] });
             else if (user.device_type == 0 && user.token != undefined && user.token != "WEB")
-                sendApns(user.token, message, payload);
+                sendApns(user.userid, user.token, message, payload);
         });
         if (done != null)
             done();
@@ -335,9 +344,9 @@ function sendPushAll(message, payload, done) {
 
 function sendPush(user, message, payload, done) {
     if (user.device_type == 1 && user.token != undefined && user.token != "WEB")
-        sendFCM(user.token, message, payload["body"], { code: payload["code"], body: payload["body"] });
+        sendFCM(user.userid, user.token, message, payload["body"], { code: payload["code"], body: payload["body"] });
     else if (user.device_type == 0 && user.token != undefined && user.token != "WEB")
-        sendApns(user.token, message, payload);
+        sendApns(user.userid, user.token, message, payload);
 
     if (done != null)
         done();
@@ -353,7 +362,7 @@ function getAllUserListForPush(done) {
                 userid: snapshot.key,
                 token: snapshot.val()._token,
                 device_type: snapshot.val().device_type,
-                name: snapshot.val(),                
+                name: snapshot.val().name,                
             };
             user_list.push(user);
         });
@@ -363,14 +372,14 @@ function getAllUserListForPush(done) {
 }
 
 function getAllMatchedUserList(done) {
-    var userRef = firebase.database().ref('/phonetalk_participant/' + new Date().yyyymmdd() + "/matched");
+    var userRef = firebase.database().ref(PHONETALK_PARTICIPANT + new Date().yyyymmdd() + "/matched");
     userRef.once("value", function (allUserSnapshot) {
         var user_list = new Array();
 
         allUserSnapshot.forEach(function (snapshot) {
             var user = {
                 userid: snapshot.key,
-                token: snapshot.val()._token,
+                token: snapshot.val().token,
                 device_type: snapshot.val().device_type,
                 name: snapshot.val().name,
                 matched: snapshot.val().matched,
@@ -382,27 +391,24 @@ function getAllMatchedUserList(done) {
             done(user_list);
     });
 }
+
 function getAllUnmatchedUserList(done) {
-    var userRef = firebase.database().ref('/phonetalk_participant/' + new Date().yyyymmdd() + "/unmatched");
+    var userRef = firebase.database().ref(PHONETALK_PARTICIPANT + new Date().yyyymmdd() + "/unmatched");
     userRef.once("value", function (allUserSnapshot) {
         var user_list = new Array();
 
         allUserSnapshot.forEach(function (snapshot) {
             var user = {
                 userid: snapshot.key,
-                token: snapshot.val()._token,
+                token: snapshot.val().token,
                 device_type: snapshot.val().device_type,
-                name: snapshot.val(),                
+                name: snapshot.val().name,                
             };
             user_list.push(user);
         });
         if (done != null)
             done(user_list);
     });
-}
-
-function sendPushForClass() {
-    sendPushAll("금일 스터디에 참여하시겠습니까?", { code: "STUDY_PARTICIPATION", body: "금일 스터디 참석 여부를 알려주세요." });
 }
 
 function addUser(userid, name, phoneno, gender, email, speaking_level, pronunciation_level, remained_class, nationality) {
@@ -452,7 +458,7 @@ function setStudyResultItems(userid) {
 function matchPhoneTalk(done){
     function getUserList(onComplete){
         var user_list = new Array();
-        var userRef = firebase.database().ref('/phonetalk_test/' + new Date().yyyymmdd());
+        var userRef = firebase.database().ref(PHONETALK_PARTICIPANT + new Date().yyyymmdd());
         userRef.once("value", function (allUserSnapshot) {
             allUserSnapshot.forEach(function (snapshot) {
                 if (snapshot.key != "matched" && snapshot.key != "unmatched") {
@@ -464,7 +470,7 @@ function matchPhoneTalk(done){
                         gender: snapshot.val().gender,
                         duration: snapshot.val().duration,
                         time: snapshot.val().time,
-                        speaking_level: snapshot.val().speaking_level,
+                        speaking_level: snapshot.val().level,
                         name:snapshot.val().name
                     };
                     user_list.push(user);
@@ -475,7 +481,7 @@ function matchPhoneTalk(done){
         });
     }
     function setMatch(from, to) {
-        var matchRef = firebase.database().ref("/phonetalk_test/" + new Date().yyyymmdd() + "/matched");
+        var matchRef = firebase.database().ref(PHONETALK_PARTICIPANT + new Date().yyyymmdd() + "/matched");
         var activityRef = firebase.database().ref("/study_activity/");        
         
         from.matched = to.userid;
@@ -488,13 +494,15 @@ function matchPhoneTalk(done){
         
         activityRef.child(from.userid + "/" + new Date().yyyymmdd()).update({matched : to.userid, matched_name : to.name});
         activityRef.child(to.userid + "/" + new Date().yyyymmdd()).update({matched : from.userid, matched_name : from.name});
+        console.log("Matched : " + to.userid + " = " + from.userid);
     }
     function setUnMatch(user) {
-        var ref = firebase.database().ref("/phonetalk_test/" + new Date().yyyymmdd() + "/unmatched");
+        var ref = firebase.database().ref(PHONETALK_PARTICIPANT + new Date().yyyymmdd() + "/unmatched");
         var activityRef = firebase.database().ref("/study_activity/");
         user.matched = "unmatched";
         ref.child(user.userid).set(user);
         activityRef.child(user.userid + "/" + new Date().yyyymmdd()).update({matched : "unmatched"});
+        console.log("Unmatched : " + user.userid);
     }
     
     getUserList(function (user_list) {
@@ -578,3 +586,20 @@ Date.prototype.yyyymmdd = function () {
     var dd = this.getDate().toString();
     return yyyy + "-" + (mm[1] ? mm : "0" + mm[0]) + "-" + (dd[1] ? dd : "0" + dd[0]); // padding
 }
+
+function init(){
+    //Initial Trigger
+
+    //sendApns(token_list[0], "금일 수업에 참여하시겠습니까?");
+
+    //sendPushAll("금일 스터디에 참여하시겠습니까?", {code : "STUDY_PARTICIPATION", body : "금일 스터디 참석 여부를 알려주세요."});
+    //sendPushAll("금일 전화영어에 참여하시겠습니까?", { code: "PHONETALK_PARTICIPATION", body: "하이요" });
+    //sendPushAll("금일 전화영어가 매치되었습니다?", { code: "PHONETALK_MATCHED", body: "하이요" });
+    minuteInterval2();
+
+    //matchPhoneTalk();
+    process.setMaxListeners(0);
+    setInterval(minuteInterval2, 60000);
+}
+
+init();
